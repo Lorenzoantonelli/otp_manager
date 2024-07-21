@@ -95,7 +95,7 @@ class OTPManager:
             return True
         else:
             print("Invalid password.")
-            return False
+            sys.exit(1)
 
     def lock(self):
         if os.path.exists(self.session_file):
