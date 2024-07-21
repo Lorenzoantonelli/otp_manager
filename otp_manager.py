@@ -5,7 +5,7 @@ import sys
 import json
 import base64
 import time
-import sys
+import subprocess
 import argparse
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -161,7 +161,7 @@ class OTPManager:
             print("No secrets stored.")
             sys.exit(1)
 
-    def generate_otp(self, name):
+    def generate_otp(self, name, copy_to_clipboard=False):
         file_path = os.path.join(self.secrets_dir, f"{name}.json")
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
@@ -174,9 +174,37 @@ class OTPManager:
             )
             otp = totp.now()
             print(f"OTP for '{name}': {otp}")
+            if copy_to_clipboard:
+                self.text_to_clipboard(otp)
             return otp
         else:
             print(f"No secret found with name '{name}'.")
+
+    def text_to_clipboard(self, text):
+        if sys.platform.startswith("linux"):
+            if "WAYLAND_DISPLAY" in os.environ:
+                try:
+                    subprocess.run(["wl-copy"], input=text.encode(), check=True)
+                except FileNotFoundError:
+                    print("wl-copy not found, is it installed?", file=sys.stderr)
+                    exit(0)
+            elif "DISPLAY" in os.environ:
+                try:
+                    p = subprocess.Popen(["xsel", "-bi"], stdin=subprocess.PIPE)
+                    p.communicate(input=text.encode())
+                except FileNotFoundError:
+                    print("xsel not found, is it installed?", file=sys.stderr)
+                    exit(0)
+        elif sys.platform.startswith("darwin"):
+            subprocess.run(["pbcopy"], input=text.encode(), check=True)
+        elif sys.platform.startswith("win"):
+            try:
+                import pyperclip
+
+                pyperclip.copy(text)
+            except ImportError:
+                print("pyperclip not found, please install it", file=sys.stderr)
+                exit(0)
 
 
 def main():
@@ -196,6 +224,9 @@ def main():
         type=int,
         default=30,
         help="Time interval for OTP in seconds (default: 30)",
+    )
+    parser.add_argument(
+        "--copy", action="store_true", help="Copy generated OTP to clipboard"
     )
     args = parser.parse_args()
 
@@ -237,7 +268,7 @@ def main():
         manager.list_secrets()
     elif args.action == "generate":
         if args.name:
-            manager.generate_otp(args.name)
+            manager.generate_otp(args.name, copy_to_clipboard=args.copy)
         else:
             print("Name is required for generate action.")
 
