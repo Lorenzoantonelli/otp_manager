@@ -284,30 +284,42 @@ class OTPManager:
             sys.exit(1)
 
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(description="OTP Manager")
-    parser.add_argument(
-        "action",
-        choices=[
-            "unlock",
-            "lock",
-            "add",
-            "update",
-            "delete",
-            "list",
-            "generate",
-            "import",
-            "rename",
-        ],
-        help="Action to perform",
+
+    action_group = parser.add_mutually_exclusive_group(required=True)
+    action_group.add_argument(
+        "-u", "--unlock", action="store_true", help="Unlock the OTP manager"
     )
-    parser.add_argument(
-        "name",
-        nargs="?",
-        help="Name of the secret, path to Aegis JSON file for import, or old name for rename",
+    action_group.add_argument(
+        "-l", "--lock", action="store_true", help="Lock the OTP manager"
     )
-    parser.add_argument("new_name", nargs="?", help="New name for rename action")
-    parser.add_argument("--secret", help="Secret value (for add and update actions)")
+    action_group.add_argument("-a", "--add", metavar="SERVICE", help="Add a new secret")
+    action_group.add_argument(
+        "-d", "--delete", metavar="SERVICE", help="Delete a secret"
+    )
+    action_group.add_argument(
+        "-g", "--generate", metavar="SERVICE", help="Generate OTP for a service"
+    )
+    action_group.add_argument(
+        "-ls", "--list", action="store_true", help="List all services"
+    )
+    action_group.add_argument(
+        "-i",
+        "--import",
+        metavar="FILE",
+        dest="import_file",
+        help="Import secrets from Aegis JSON file",
+    )
+    action_group.add_argument(
+        "-r",
+        "--rename",
+        nargs=2,
+        metavar=("OLD_NAME", "NEW_NAME"),
+        help="Rename a service",
+    )
+
+    parser.add_argument("-s", "--secret", help="Secret value for adding or updating")
     parser.add_argument(
         "--digits", type=int, default=6, help="Number of digits for OTP (default: 6)"
     )
@@ -318,67 +330,45 @@ def main():
         help="Time interval for OTP in seconds (default: 30)",
     )
     parser.add_argument(
-        "--copy", action="store_true", help="Copy generated OTP to clipboard"
+        "-c", "--copy", action="store_true", help="Copy generated OTP to clipboard"
     )
-    args = parser.parse_args()
 
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
     manager = OTPManager()
 
-    if args.action == "lock":
+    if args.lock:
         manager.lock()
         return
 
     if not manager.load_session():
-        if args.action != "unlock":
+        if not args.unlock:
             print("Session expired or not found. Please unlock the OTP manager.")
             sys.exit(1)
         password = getpass("Enter your master password: ")
         if not manager.unlock(password):
             print("Failed to unlock OTP manager.")
             sys.exit(1)
-    elif args.action == "unlock":
+    elif args.unlock:
         print("OTP manager is already unlocked.")
         return
 
-    if args.action == "add":
-        if args.name:
-            secret = args.secret if args.secret else getpass("Enter the secret: ")
-            manager.add_secret(args.name, secret, args.digits, args.interval)
-        else:
-            print("Name is required for add action.")
-            sys.exit(1)
-    elif args.action == "update":
-        if args.name and args.secret:
-            manager.update_secret(args.name, args.secret, args.digits, args.interval)
-        else:
-            print("Both name and secret are required for update action.")
-            sys.exit(1)
-    elif args.action == "delete":
-        if args.name:
-            manager.delete_secret(args.name)
-        else:
-            print("Name is required for delete action.")
-            sys.exit(1)
-    elif args.action == "list":
+    if args.add:
+        secret = args.secret if args.secret else getpass("Enter the secret: ")
+        manager.add_secret(args.add, secret, args.digits, args.interval)
+    elif args.delete:
+        manager.delete_secret(args.delete)
+    elif args.generate:
+        manager.generate_otp(args.generate, copy_to_clipboard=args.copy)
+    elif args.list:
         manager.list_secrets()
-    elif args.action == "generate":
-        if args.name:
-            manager.generate_otp(args.name, copy_to_clipboard=args.copy)
-        else:
-            print("Name is required for generate action.")
-            sys.exit(1)
-    elif args.action == "import":
-        if args.name:
-            manager.import_aegis_json(args.name)
-        else:
-            print("Path to Aegis JSON file is required for import action.")
-            sys.exit(1)
-    elif args.action == "rename":
-        if args.name and args.new_name:
-            manager.rename_service(args.name, args.new_name)
-        else:
-            print("Both old name and new name are required for rename action.")
-            sys.exit(1)
+    elif args.import_file:
+        manager.import_aegis_json(args.import_file)
+    elif args.rename:
+        manager.rename_service(args.rename[0], args.rename[1])
 
 
 if __name__ == "__main__":
