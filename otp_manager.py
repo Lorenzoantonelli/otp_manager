@@ -206,15 +206,72 @@ class OTPManager:
                 print("pyperclip not found, please install it", file=sys.stderr)
                 exit(0)
 
+    def import_aegis_json(self, json_file):
+        try:
+            with open(json_file, "r") as f:
+                aegis_data = json.load(f)
+
+            if "db" not in aegis_data or "entries" not in aegis_data["db"]:
+                print("Invalid Aegis JSON format.")
+                sys.exit(1)
+
+            imported_count = 0
+            for entry in aegis_data["db"]["entries"]:
+                if entry["type"] != "totp":
+                    continue
+
+                name = (
+                    f"{entry['issuer']}_{entry['name']}"
+                    if entry["issuer"]
+                    else entry["name"]
+                )
+                secret = entry["info"]["secret"]
+                digits = entry["info"].get("digits", 6)
+                period = entry["info"].get("period", 30)
+
+                file_path = os.path.join(self.secrets_dir, f"{name}.json")
+                if os.path.exists(file_path):
+                    print(f"Secret '{name}' already exists. Skipping.")
+                    continue
+
+                self.add_secret(name, secret, digits, period)
+                imported_count += 1
+
+            print(
+                f"Successfully imported {imported_count} TOTP secrets from Aegis backup."
+            )
+        except json.JSONDecodeError:
+            print("Invalid JSON file.")
+            sys.exit(1)
+        except FileNotFoundError:
+            print(f"File not found: {json_file}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"An error occurred while importing: {str(e)}")
+            sys.exit(1)
+
 
 def main():
     parser = argparse.ArgumentParser(description="OTP Manager")
     parser.add_argument(
         "action",
-        choices=["unlock", "lock", "add", "update", "delete", "list", "generate"],
+        choices=[
+            "unlock",
+            "lock",
+            "add",
+            "update",
+            "delete",
+            "list",
+            "generate",
+            "import",
+        ],
         help="Action to perform",
     )
-    parser.add_argument("name", nargs="?", help="Name of the secret")
+    parser.add_argument(
+        "name",
+        nargs="?",
+        help="Name of the secret or path to Aegis JSON file for import",
+    )
     parser.add_argument("--secret", help="Secret value (for add and update actions)")
     parser.add_argument(
         "--digits", type=int, default=6, help="Number of digits for OTP (default: 6)"
@@ -239,11 +296,11 @@ def main():
     if not manager.load_session():
         if args.action != "unlock":
             print("Session expired or not found. Please unlock the OTP manager.")
-            return
+            sys.exit(1)
         password = getpass("Enter your master password: ")
         if not manager.unlock(password):
             print("Failed to unlock OTP manager.")
-            return
+            sys.exit(1)
     elif args.action == "unlock":
         print("OTP manager is already unlocked.")
         return
@@ -254,16 +311,19 @@ def main():
             manager.add_secret(args.name, secret, args.digits, args.interval)
         else:
             print("Name is required for add action.")
+            sys.exit(1)
     elif args.action == "update":
         if args.name and args.secret:
             manager.update_secret(args.name, args.secret, args.digits, args.interval)
         else:
             print("Both name and secret are required for update action.")
+            sys.exit(1)
     elif args.action == "delete":
         if args.name:
             manager.delete_secret(args.name)
         else:
             print("Name is required for delete action.")
+            sys.exit(1)
     elif args.action == "list":
         manager.list_secrets()
     elif args.action == "generate":
@@ -271,6 +331,13 @@ def main():
             manager.generate_otp(args.name, copy_to_clipboard=args.copy)
         else:
             print("Name is required for generate action.")
+            sys.exit(1)
+    elif args.action == "import":
+        if args.name:
+            manager.import_aegis_json(args.name)
+        else:
+            print("Path to Aegis JSON file is required for import action.")
+            sys.exit(1)
 
 
 if __name__ == "__main__":
