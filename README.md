@@ -20,6 +20,7 @@ Features that will be available in the next updates:
 Clone the repo and install the package:
 ```bash
 git clone https://github.com/Lorenzoantonelli/otp_manager.git
+cd otp_manager
 pip install .
 ```
 
