@@ -17,21 +17,22 @@ Features that will be available in the next updates:
 
 ## How to use
 
-Install the requirements:
+Clone the repo and install the package:
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/Lorenzoantonelli/otp_manager.git
+pip install .
 ```
 
 To use the interactive mode install [gum](https://github.com/charmbracelet/gum).
 
 Unlock it for the first time to set the master password:
 ```bash
-./main.py --unlock
+otp-manager --unlock
 ```
 
 ## Usage
 ```
-usage: main.py [-h]
+usage: otp-manager [-h]
                (-u | -l | -a SERVICE | -d SERVICE | -g [SERVICE] | -ls | -i FILE | -r OLD_NAME NEW_NAME)
                [-s SECRET] [--digits DIGITS] [--interval INTERVAL] [-c]
 
@@ -63,11 +64,11 @@ options:
 ## Examples
 ### Add a new service
 ```bash
-./main.py -a my_new_service
+otp-manager -a my_new_service
 ```
 
 ### Generate the OTP for a service
 ```bash
-./main.py -g my_new_service
+otp-manager -g my_new_service
 ```
 
