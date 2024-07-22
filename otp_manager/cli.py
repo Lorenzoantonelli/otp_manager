@@ -45,6 +45,9 @@ def parse_arguments():
         metavar=("OLD_NAME", "NEW_NAME"),
         help="Rename a service",
     )
+    action_group.add_argument(
+        "-qr", metavar="SERVICE", help="Generate a QR code for the service"
+    )
 
     parser.add_argument("-s", "--secret", help="Secret value for adding or updating")
     parser.add_argument(
@@ -143,3 +146,5 @@ def handle_cli_commands(args, manager):
         manager.import_aegis_json(args.import_file)
     elif args.rename:
         manager.rename_service(args.rename[0], args.rename[1])
+    elif args.qr:
+        manager.generate_qr_code(args.qr)

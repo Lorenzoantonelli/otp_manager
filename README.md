@@ -13,7 +13,7 @@ Features:
 Features that will be available in the next updates:
 - [ ] Encrypted backups
 - [ ] User defined unlock time
-- [ ] QR Code export
+- [x] QR Code export
 
 ## How to use
 
@@ -72,4 +72,3 @@ otp-manager -a my_new_service
 ```bash
 otp-manager -g my_new_service
 ```
-
