@@ -128,19 +128,21 @@ class OTPManager:
         else:
             print(f"No secret found with name '{name}'.")
 
-    def list_secrets(self):
+    def list_secrets(self, return_list=False):
         secrets = [
             os.path.splitext(f)[0]
             for f in os.listdir(self.secrets_dir)
             if f.endswith(".json")
         ]
         secrets.sort(key=str.casefold)
+        if return_list:
+            return secrets
         if secrets:
             for name in secrets:
                 print(name)
         else:
             print("No secrets stored.")
-            sys.exit(1)
+        return None
 
     def generate_otp(self, name, copy_to_clipboard=False):
         file_path = os.path.join(self.secrets_dir, f"{name}.json")

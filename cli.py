@@ -1,6 +1,8 @@
 import argparse
 from getpass import getpass
 import sys
+import shutil
+import subprocess
 from clipboard_utils import text_to_clipboard
 
 
@@ -19,7 +21,12 @@ def parse_arguments():
         "-d", "--delete", metavar="SERVICE", help="Delete a secret"
     )
     action_group.add_argument(
-        "-g", "--generate", metavar="SERVICE", help="Generate OTP for a service"
+        "-g",
+        "--generate",
+        nargs="?",
+        const="",
+        metavar="SERVICE",
+        help="Generate OTP for a service. If no service is provided, enter interactive mode.",
     )
     action_group.add_argument(
         "-ls", "--list", action="store_true", help="List all services"
@@ -56,6 +63,47 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def is_gum_available():
+    return shutil.which("gum") is not None
+
+
+def select_service_interactively(manager):
+    if not is_gum_available():
+        print(
+            "Error: 'gum' is not installed. Please install it to use the interactive mode."
+        )
+        print("You can install gum from https://github.com/charmbracelet/gum")
+        return None
+
+    try:
+        services = manager.list_secrets(return_list=True)
+        if not services:
+            print("No services found.")
+            return None
+
+        gum_input = "\n".join(services)
+
+        process = subprocess.Popen(
+            ["gum", "filter"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+
+        stdout, _ = process.communicate(input=gum_input)
+
+        if process.returncode == 0:
+            return stdout.strip()
+        else:
+            print("No service selected.")
+            return None
+    except FileNotFoundError:
+        print(
+            "Error: 'gum' is not installed. Please install it to use the interactive mode."
+        )
+        return None
+
+
 def handle_cli_commands(args, manager):
     if args.lock:
         manager.lock()
@@ -78,8 +126,15 @@ def handle_cli_commands(args, manager):
         manager.add_secret(args.add, secret, args.digits, args.interval)
     elif args.delete:
         manager.delete_secret(args.delete)
-    elif args.generate:
-        otp = manager.generate_otp(args.generate)
+    elif args.generate is not None:
+        if args.generate == "":
+            service = select_service_interactively(manager)
+            if service is None:
+                return
+        else:
+            service = args.generate
+
+        otp = manager.generate_otp(service)
         if args.copy:
             text_to_clipboard(otp)
     elif args.list:
