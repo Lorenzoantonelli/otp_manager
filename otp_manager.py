@@ -156,7 +156,7 @@ class OTPManager:
                 interval=secret_data["interval"],
             )
             otp = totp.now()
-            print(f"OTP for '{name}': {otp}")
+            print(f"{name}: {otp}")
             return otp
         else:
             print(f"No secret found with name '{name}'.")
