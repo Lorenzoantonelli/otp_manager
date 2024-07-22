@@ -1,17 +1,13 @@
-#! /usr/bin/env python3
-
 import os
 import sys
 import json
 import base64
 import time
-import subprocess
-import argparse
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from getpass import getpass
 import pyotp
+from crypto_utils import derive_key, encrypt_secret, decrypt_secret
 
 
 class OTPManager:
@@ -40,21 +36,12 @@ class OTPManager:
                 f.write(salt)
             return salt
 
-    def derive_key(self, password):
-        kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=self.salt,
-            iterations=100000,
-        )
-        return base64.urlsafe_b64encode(kdf.derive(password.encode()))
-
     def get_or_create_hash(self, password):
         if os.path.exists(self.hash_file):
             with open(self.hash_file, "rb") as f:
                 return f.read()
         else:
-            hashed_password = self.derive_key(password)
+            hashed_password = derive_key(password, self.salt)
             with open(self.hash_file, "wb") as f:
                 f.write(hashed_password)
             return hashed_password
@@ -89,7 +76,7 @@ class OTPManager:
 
     def unlock(self, password):
         stored_hash = self.get_or_create_hash(password)
-        if stored_hash == self.derive_key(password):
+        if stored_hash == derive_key(password, self.salt):
             self.key = stored_hash
             self.create_session()
             return True
@@ -103,16 +90,8 @@ class OTPManager:
         self.key = None
         print("OTP Manager has been locked.")
 
-    def encrypt_secret(self, secret):
-        f = Fernet(self.key)
-        return f.encrypt(secret.encode()).decode()
-
-    def decrypt_secret(self, encrypted_secret):
-        f = Fernet(self.key)
-        return f.decrypt(encrypted_secret.encode()).decode()
-
     def add_secret(self, name, secret, digits=6, interval=30):
-        encrypted_secret = self.encrypt_secret(secret)
+        encrypted_secret = encrypt_secret(secret, self.key)
         secret_data = {
             "name": name,
             "secret": encrypted_secret,
@@ -129,7 +108,7 @@ class OTPManager:
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 secret_data = json.load(file)
-            encrypted_secret = self.encrypt_secret(new_secret)
+            encrypted_secret = encrypt_secret(new_secret, self.key)
             secret_data["secret"] = encrypted_secret
             if digits:
                 secret_data["digits"] = digits
@@ -168,7 +147,7 @@ class OTPManager:
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 secret_data = json.load(file)
-            decrypted_secret = self.decrypt_secret(secret_data["secret"])
+            decrypted_secret = decrypt_secret(secret_data["secret"], self.key)
             totp = pyotp.TOTP(
                 decrypted_secret,
                 digits=secret_data["digits"],
@@ -176,37 +155,9 @@ class OTPManager:
             )
             otp = totp.now()
             print(f"OTP for '{name}': {otp}")
-            if copy_to_clipboard:
-                self.text_to_clipboard(otp)
             return otp
         else:
             print(f"No secret found with name '{name}'.")
-
-    def text_to_clipboard(self, text):
-        if sys.platform.startswith("linux"):
-            if "WAYLAND_DISPLAY" in os.environ:
-                try:
-                    subprocess.run(["wl-copy"], input=text.encode(), check=True)
-                except FileNotFoundError:
-                    print("wl-copy not found, is it installed?", file=sys.stderr)
-                    exit(0)
-            elif "DISPLAY" in os.environ:
-                try:
-                    p = subprocess.Popen(["xsel", "-bi"], stdin=subprocess.PIPE)
-                    p.communicate(input=text.encode())
-                except FileNotFoundError:
-                    print("xsel not found, is it installed?", file=sys.stderr)
-                    exit(0)
-        elif sys.platform.startswith("darwin"):
-            subprocess.run(["pbcopy"], input=text.encode(), check=True)
-        elif sys.platform.startswith("win"):
-            try:
-                import pyperclip
-
-                pyperclip.copy(text)
-            except ImportError:
-                print("pyperclip not found, please install it", file=sys.stderr)
-                exit(0)
 
     def import_aegis_json(self, json_file):
         try:
@@ -282,94 +233,3 @@ class OTPManager:
         except Exception as e:
             print(f"An error occurred while renaming the secret: {str(e)}")
             sys.exit(1)
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="OTP Manager")
-
-    action_group = parser.add_mutually_exclusive_group(required=True)
-    action_group.add_argument(
-        "-u", "--unlock", action="store_true", help="Unlock the OTP manager"
-    )
-    action_group.add_argument(
-        "-l", "--lock", action="store_true", help="Lock the OTP manager"
-    )
-    action_group.add_argument("-a", "--add", metavar="SERVICE", help="Add a new secret")
-    action_group.add_argument(
-        "-d", "--delete", metavar="SERVICE", help="Delete a secret"
-    )
-    action_group.add_argument(
-        "-g", "--generate", metavar="SERVICE", help="Generate OTP for a service"
-    )
-    action_group.add_argument(
-        "-ls", "--list", action="store_true", help="List all services"
-    )
-    action_group.add_argument(
-        "-i",
-        "--import",
-        metavar="FILE",
-        dest="import_file",
-        help="Import secrets from Aegis JSON file",
-    )
-    action_group.add_argument(
-        "-r",
-        "--rename",
-        nargs=2,
-        metavar=("OLD_NAME", "NEW_NAME"),
-        help="Rename a service",
-    )
-
-    parser.add_argument("-s", "--secret", help="Secret value for adding or updating")
-    parser.add_argument(
-        "--digits", type=int, default=6, help="Number of digits for OTP (default: 6)"
-    )
-    parser.add_argument(
-        "--interval",
-        type=int,
-        default=30,
-        help="Time interval for OTP in seconds (default: 30)",
-    )
-    parser.add_argument(
-        "-c", "--copy", action="store_true", help="Copy generated OTP to clipboard"
-    )
-
-    return parser.parse_args()
-
-
-def main():
-    args = parse_arguments()
-    manager = OTPManager()
-
-    if args.lock:
-        manager.lock()
-        return
-
-    if not manager.load_session():
-        if not args.unlock:
-            print("Session expired or not found. Please unlock the OTP manager.")
-            sys.exit(1)
-        password = getpass("Enter your master password: ")
-        if not manager.unlock(password):
-            print("Failed to unlock OTP manager.")
-            sys.exit(1)
-    elif args.unlock:
-        print("OTP manager is already unlocked.")
-        return
-
-    if args.add:
-        secret = args.secret if args.secret else getpass("Enter the secret: ")
-        manager.add_secret(args.add, secret, args.digits, args.interval)
-    elif args.delete:
-        manager.delete_secret(args.delete)
-    elif args.generate:
-        manager.generate_otp(args.generate, copy_to_clipboard=args.copy)
-    elif args.list:
-        manager.list_secrets()
-    elif args.import_file:
-        manager.import_aegis_json(args.import_file)
-    elif args.rename:
-        manager.rename_service(args.rename[0], args.rename[1])
-
-
-if __name__ == "__main__":
-    main()
