@@ -220,11 +220,14 @@ class OTPManager:
                 if entry["type"] != "totp":
                     continue
 
-                name = (
-                    f"{entry['issuer']}_{entry['name']}"
-                    if entry["issuer"]
-                    else entry["name"]
-                )
+                issuer = entry["issuer"].strip() if entry["issuer"] else ""
+                name = entry["name"].strip()
+
+                if issuer.lower() == name.lower():
+                    name = issuer or name
+                elif issuer:
+                    name = f"{issuer}_{name}"
+
                 secret = entry["info"]["secret"]
                 digits = entry["info"].get("digits", 6)
                 period = entry["info"].get("period", 30)
