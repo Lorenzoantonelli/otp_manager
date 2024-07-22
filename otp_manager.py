@@ -151,9 +151,11 @@ class OTPManager:
 
     def list_secrets(self):
         secrets = [
-            f.split(".")[0] for f in os.listdir(self.secrets_dir) if f.endswith(".json")
+            os.path.splitext(f)[0]
+            for f in os.listdir(self.secrets_dir)
+            if f.endswith(".json")
         ]
-        secrets.sort()
+        secrets.sort(key=str.casefold)
         if secrets:
             for name in secrets:
                 print(name)
