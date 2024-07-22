@@ -2,6 +2,9 @@ import sys
 import os
 import subprocess
 
+# Thanks to https://github.com/d1c0n for the precious contribution
+
+
 def text_to_clipboard(text):
     if sys.platform.startswith("linux"):
         if "WAYLAND_DISPLAY" in os.environ:
@@ -22,6 +25,7 @@ def text_to_clipboard(text):
     elif sys.platform.startswith("win"):
         try:
             import pyperclip
+
             pyperclip.copy(text)
         except ImportError:
             print("pyperclip not found, please install it", file=sys.stderr)
