@@ -3,6 +3,7 @@ import sys
 import json
 import base64
 import time
+import segno
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -25,6 +26,9 @@ class OTPManager:
     def ensure_dirs(self):
         os.makedirs(self.base_dir, exist_ok=True)
         os.makedirs(self.secrets_dir, exist_ok=True)
+
+    def get_file_path(self, name):
+        return os.path.join(self.secrets_dir, f"{name}.json")
 
     def get_or_create_salt(self):
         if os.path.exists(self.salt_file):
@@ -98,13 +102,13 @@ class OTPManager:
             "digits": digits,
             "interval": interval,
         }
-        file_path = os.path.join(self.secrets_dir, f"{name}.json")
+        file_path = self.get_file_path(name)
         with open(file_path, "w") as file:
             json.dump(secret_data, file)
         print(f"Secret '{name}' added successfully.")
 
     def update_secret(self, name, new_secret, digits=None, interval=None):
-        file_path = os.path.join(self.secrets_dir, f"{name}.json")
+        file_path = self.get_file_path(name)
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 secret_data = json.load(file)
@@ -121,7 +125,7 @@ class OTPManager:
             print(f"No secret found with name '{name}'.")
 
     def delete_secret(self, name):
-        file_path = os.path.join(self.secrets_dir, f"{name}.json")
+        file_path = self.get_file_path(name)
         if os.path.exists(file_path):
             os.remove(file_path)
             print(f"Secret '{name}' deleted successfully.")
@@ -145,7 +149,7 @@ class OTPManager:
         return None
 
     def generate_otp(self, name, copy_to_clipboard=False):
-        file_path = os.path.join(self.secrets_dir, f"{name}.json")
+        file_path = self.get_file_path(name)
         if os.path.exists(file_path):
             with open(file_path, "r") as file:
                 secret_data = json.load(file)
@@ -160,6 +164,22 @@ class OTPManager:
             return otp
         else:
             print(f"No secret found with name '{name}'.")
+
+    def generate_qr_code(self, name):
+        file_path = self.get_file_path(name)
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                secret_data = json.load(file)
+            decrypted_secret = decrypt_secret(secret_data["secret"], self.key)
+            issuer = name.split("_")[0]
+            digits = secret_data["digits"]
+            period = secret_data["interval"]
+            qr_data = f"otpauth://totp/{name}?secret={decrypted_secret}&issuer={issuer}&digits={digits}&period={period}"
+            qr = segno.make(qr_data)
+            qr.terminal(compact=True)
+        else:
+            print(f"No secret found with name '{name}'.")
+            sys.exit(1)
 
     def import_aegis_json(self, json_file):
         try:
@@ -209,8 +229,8 @@ class OTPManager:
             sys.exit(1)
 
     def rename_service(self, old_name, new_name):
-        old_file_path = os.path.join(self.secrets_dir, f"{old_name}.json")
-        new_file_path = os.path.join(self.secrets_dir, f"{new_name}.json")
+        old_file_path = self.get_file_path(old_name)
+        new_file_path = self.get_file_path(new_name)
 
         if not os.path.exists(old_file_path):
             print(f"No secret found with name '{old_name}'.")

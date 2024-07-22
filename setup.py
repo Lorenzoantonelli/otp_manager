@@ -12,7 +12,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/lorenzoantonelli/otp-manager",
     packages=find_packages(),
-    install_requires=["cryptography", "pyotp"],
+    install_requires=["cryptography", "pyotp", "segno"],
     entry_points={
         "console_scripts": [
             "otp-manager=otp_manager.main:main",
