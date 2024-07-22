@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from otp_manager import OTPManager
-from cli import parse_arguments, handle_cli_commands
+from .otp_manager import OTPManager
+from .cli import parse_arguments, handle_cli_commands
 
 
 def main():
