@@ -255,6 +255,34 @@ class OTPManager:
             print(f"An error occurred while importing: {str(e)}")
             sys.exit(1)
 
+    def rename_service(self, old_name, new_name):
+        old_file_path = os.path.join(self.secrets_dir, f"{old_name}.json")
+        new_file_path = os.path.join(self.secrets_dir, f"{new_name}.json")
+
+        if not os.path.exists(old_file_path):
+            print(f"No secret found with name '{old_name}'.")
+            sys.exit(1)
+
+        if os.path.exists(new_file_path):
+            print(f"A secret with name '{new_name}' already exists.")
+            sys.exit(1)
+
+        try:
+            with open(old_file_path, "r") as file:
+                secret_data = json.load(file)
+
+            secret_data["name"] = new_name
+
+            with open(new_file_path, "w") as file:
+                json.dump(secret_data, file)
+
+            os.remove(old_file_path)
+
+            print(f"Secret renamed from '{old_name}' to '{new_name}' successfully.")
+        except Exception as e:
+            print(f"An error occurred while renaming the secret: {str(e)}")
+            sys.exit(1)
+
 
 def main():
     parser = argparse.ArgumentParser(description="OTP Manager")
@@ -269,14 +297,16 @@ def main():
             "list",
             "generate",
             "import",
+            "rename",
         ],
         help="Action to perform",
     )
     parser.add_argument(
         "name",
         nargs="?",
-        help="Name of the secret or path to Aegis JSON file for import",
+        help="Name of the secret, path to Aegis JSON file for import, or old name for rename",
     )
+    parser.add_argument("new_name", nargs="?", help="New name for rename action")
     parser.add_argument("--secret", help="Secret value (for add and update actions)")
     parser.add_argument(
         "--digits", type=int, default=6, help="Number of digits for OTP (default: 6)"
@@ -342,6 +372,12 @@ def main():
             manager.import_aegis_json(args.name)
         else:
             print("Path to Aegis JSON file is required for import action.")
+            sys.exit(1)
+    elif args.action == "rename":
+        if args.name and args.new_name:
+            manager.rename_service(args.name, args.new_name)
+        else:
+            print("Both old name and new name are required for rename action.")
             sys.exit(1)
 
 
