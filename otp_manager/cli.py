@@ -3,7 +3,7 @@ from getpass import getpass
 import sys
 import shutil
 import subprocess
-from clipboard_utils import text_to_clipboard
+from .clipboard_utils import text_to_clipboard
 
 
 def parse_arguments():

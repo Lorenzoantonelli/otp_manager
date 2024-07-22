@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import pyotp
-from crypto_utils import derive_key, encrypt_secret, decrypt_secret
+from .crypto_utils import derive_key, encrypt_secret, decrypt_secret
 
 
 class OTPManager:
